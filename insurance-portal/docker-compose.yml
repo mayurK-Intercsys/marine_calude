@@ -1,0 +1,46 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_pw
+      MYSQL_DATABASE: insurance_portal
+      MYSQL_USER: portal
+      MYSQL_PASSWORD: portal_dev_pw
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports: ["3306:3306"]
+    volumes: [mysql-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_dev_pw"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ./api
+    environment:
+      # Demo stack over plain HTTP: development mode shows test sign-in codes and allows non-HTTPS cookies.
+      # Use NODE_ENV=production with HTTPS and a real JWT_SECRET in any shared environment.
+      NODE_ENV: development
+      PORT: 4000
+      APP_URL: http://localhost:3000
+      JWT_SECRET: change-me-before-any-shared-environment
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: portal
+      DB_PASSWORD: portal_dev_pw
+      DB_NAME: insurance_portal
+      DEV_OTP_ECHO: "true"
+      # Renewals, reminders, auto-renewal and expiry once a day (single API instance only)
+      RUN_SCHEDULER: "true"
+    depends_on:
+      mysql: { condition: service_healthy }
+    ports: ["4000:4000"]
+
+  web:
+    build:
+      context: ./web
+      args: { API_URL: "http://api:4000" }
+    depends_on: [api]
+    ports: ["3000:3000"]
+
+volumes:
+  mysql-data:
